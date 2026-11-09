@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESQNET - Command Center Dashboard</title>
+    <style>
+        :root {
+            --bg: #0b1120;
+            --panel: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --red: #ef4444;
+            --amber: #f59e0b;
+            --green: #10b981;
+            --blue: #3b82f6;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { margin: 0; background: var(--bg); color: var(--text); padding: 20px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand h1 { margin: 0; font-size: 1.5rem; letter-spacing: 0.5px; color: #f87171; }
+        .formula-pill { background: #0f172a; border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; font-size: 0.82rem; color: #cbd5e1; }
+        .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-weight: 600; cursor: pointer; font-size: 0.82rem; }
+        .btn:hover { background: #334155; }
+        .btn-primary { background: var(--blue); border-color: var(--blue); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+        .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+        .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+        .stat-val { font-size: 1.75rem; font-weight: 800; margin-top: 4px; }
+        .main-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        @media (max-width: 1024px) { .main-layout { grid-template-columns: 1fr; } }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .score-badge { display: inline-block; padding: 6px 10px; border-radius: 8px; font-weight: 800; font-size: 1rem; background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid #ef4444; }
+        .dup-warning { display: inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 6px; background: rgba(245,158,11,0.2); border: 1px solid var(--amber); color: #fde68a; font-size: 0.75rem; font-weight: 700; }
+        .status-pill { padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+        .status-Pending { background: rgba(239,68,68,0.2); color: #fca5a5; }
+        .status-Dispatched { background: rgba(245,158,11,0.2); color: #fde68a; }
+        .status-Rescued { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+        .radar-box { width: 100%; height: 340px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; position: relative; overflow: hidden; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">
+            <h1>RESQNET COMMAND CENTER</h1>
+            <span style="background:#065f46; color:#6ee7b7; padding:4px 10px; border-radius:999px; font-size:0.75rem; font-weight:700;">LOCAL HOTSPOT ACTIVE</span>
+        </div>
+        <div class="formula-pill">
+            <strong>Urgency Score Formula:</strong> (3 &times; Children) + (2 &times; Injured) + Type Weight + Minutes Waiting
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a href="/sos" target="_blank" class="btn btn-primary" style="text-decoration:none;">Open Mobile SOS App (/sos)</a>
+            <button class="btn" onclick="seedDemo()">Load Demo Cases</button>
+            <button class="btn" onclick="resetDb()">Clear All</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Pending Rescue</div>
+            <div class="stat-val" id="statPending" style="color: #f87171;">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Teams Dispatched</div>
+            <div class="stat-val" id="statDispatched" style="color: #fbbf24;">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Survivors Rescued</div>
+            <div class="stat-val" id="statRescued" style="color: #34d399;">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Stranded People</div>
+            <div class="stat-val" id="statPeople" style="color: #60a5fa;">0</div>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="margin:0;">Prioritized SOS Queue (Auto-Ranked by Urgency)</h3>
+                <span id="lastSync" style="font-size:0.78rem; color:var(--muted);">Syncing...</span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank / Score</th>
+                            <th>Emergency & Breakdown</th>
+                            <th>Victim & Notes</th>
+                            <th>GPS Position</th>
+                            <th>Status</th>
+                            <th>Operator Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="casesBody">
+                        <tr><td colspan="6" style="text-align:center; color:var(--muted);">No active SOS requests. Click "Load Demo Cases" or submit from /sos.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 style="margin-top:0; margin-bottom:8px;">Offline Tactical GPS Plot (~100m Hotspot Zone)</h3>
+            <p style="font-size:0.78rem; color:var(--muted); margin-top:0;">Plots victim coordinates relative to Rescue Laptop Hotspot without requiring internet map tiles.</p>
+            <canvas id="radarCanvas" class="radar-box" width="420" height="340"></canvas>
+            <div style="margin-top:12px; font-size:0.78rem; color:var(--muted); display:flex; justify-content:space-between;">
+                <span>🔴 Pending SOS</span>
+                <span>🟡 Dispatched</span>
+                <span>🟢 Rescued</span>
+                <span>🔵 Rescue Laptop</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchCases() {
+            try {
+                const res = await fetch("/api/cases");
+                const data = await res.json();
+                renderDashboard(data.cases);
+                document.getElementById("lastSync").innerText = "Updated: " + new Date().toLocaleTimeString();
+            } catch (err) {
+                document.getElementById("lastSync").innerText = "Server link interrupted";
+            }
+        }
+
+        function renderDashboard(cases) {
+            const pending = cases.filter(c => c.status === "Pending").length;
+            const dispatched = cases.filter(c => c.status === "Dispatched").length;
+            const rescued = cases.filter(c => c.status === "Rescued").length;
+            const totalPeople = cases.filter(c => c.status !== "Rescued").reduce((acc, c) => acc + c.people_count, 0);
+
+            document.getElementById("statPending").innerText = pending;
+            document.getElementById("statDispatched").innerText = dispatched;
+            document.getElementById("statRescued").innerText = rescued;
+            document.getElementById("statPeople").innerText = totalPeople;
+
+            const tbody = document.getElementById("casesBody");
+            if (cases.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted);">No active SOS requests. Click "Load Demo Cases" or submit from /sos.</td></tr>';
+                drawRadar([]);
+                return;
+            }
+
+            tbody.innerHTML = cases.map((c, idx) => `
+                <tr style="${c.status === 'Rescued' ? 'opacity: 0.55;' : ''}">
+                    <td>
+                        <div style="font-size:0.75rem; color:var(--muted); margin-bottom:4px;">#${idx + 1} (ID: ${c.id})</div>
+                        <span class="score-badge">${c.urgency_score}</span>
+                    </td>
+                    <td>
+                        <strong style="font-size:0.95rem; color:#f8fafc;">${c.emergency_type}</strong><br>
+                        <span style="font-size:0.78rem; color:var(--muted);">
+                            👥 ${c.people_count} People &bull; 🧒 ${c.children_count} Children (+${c.children_count*3}) &bull; 🩹 ${c.injured_count} Injured (+${c.injured_count*2})<br>
+                            ⏱️ Waiting ${c.minutes_waiting}m (+${c.minutes_waiting}) &bull; Type Wt (+${c.type_weight})
+                        </span>
+                        ${c.duplicate_of ? `
+                            <div>
+                                <span class="dup-warning">⚠️ Likely Duplicate of Case #${c.duplicate_of} (&lt;50m)</span>
+                                <button class="btn" style="padding:3px 8px; font-size:0.72rem; margin-left:6px;" onclick="mergeCase(${c.id})">Merge into #${c.duplicate_of}</button>
+                            </div>
+                        ` : ''}
+                    </td>
+                    <td>
+                        <strong>${c.victim_name}</strong> (${c.phone})<br>
+                        <span style="font-size:0.8rem; color:#cbd5e1;">${c.notes || 'No extra notes'}</span>
+                    </td>
+                    <td style="font-family:monospace; font-size:0.82rem;">
+                        ${c.latitude.toFixed(5)},<br>${c.longitude.toFixed(5)}
+                    </td>
+                    <td>
+                        <span class="status-pill status-${c.status}">${c.status}</span>
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            ${c.status === 'Pending' ? `<button class="btn" style="border-color:#f59e0b; color:#fde68a;" onclick="setStatus(${c.id}, 'Dispatched')">Dispatch</button>` : ''}
+                            ${c.status !== 'Rescued' ? `<button class="btn" style="border-color:#10b981; color:#6ee7b7;" onclick="setStatus(${c.id}, 'Rescued')">Mark Rescued</button>` : ''}
+                            ${c.status !== 'Pending' ? `<button class="btn" onclick="setStatus(${c.id}, 'Pending')">Reopen</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join("");
+
+            drawRadar(cases);
+        }
+
+        function drawRadar(cases) {
+            const canvas = document.getElementById("radarCanvas");
+            const ctx = canvas.getContext("2d");
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const cx = w / 2;
+            const cy = h / 2;
+
+            // Draw radar rings
+            ctx.strokeStyle = "#1e293b";
+            ctx.lineWidth = 1;
+            [45, 90, 135].forEach(r => {
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            // Crosshairs
+            ctx.beginPath();
+            ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+            ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+            ctx.stroke();
+
+            // Center hotspot node
+            ctx.fillStyle = "#3b82f6";
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#93c5fd";
+            ctx.font = "11px sans-serif";
+            ctx.fillText("RESCUE LAPTOP", cx + 10, cy + 4);
+
+            if (cases.length === 0) return;
+
+            const lats = cases.map(c => c.latitude);
+            const lons = cases.map(c => c.longitude);
+            const avgLat = lats.reduce((a,b)=>a+b, 0) / lats.length;
+            const avgLon = lons.reduce((a,b)=>a+b, 0) / lons.length;
+
+            cases.forEach(c => {
+                const dx = (c.longitude - avgLon) * 18000;
+                const dy = -(c.latitude - avgLat) * 18000;
+                const px = Math.max(24, Math.min(w - 24, cx + dx));
+                const py = Math.max(24, Math.min(h - 24, cy + dy));
+
+                ctx.fillStyle = c.status === "Pending" ? "#ef4444" : (c.status === "Dispatched" ? "#f59e0b" : "#10b981");
+                ctx.beginPath();
+                ctx.arc(px, py, 7, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#f8fafc";
+                ctx.font = "bold 11px sans-serif";
+                ctx.fillText(`#${c.id} (${c.urgency_score})`, px + 9, py + 4);
+            });
+        }
+
+        async function setStatus(id, status) {
+            await fetch(`/api/cases/${id}/status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status })
+            });
+            fetchCases();
+        }
+
+        async function mergeCase(id) {
+            await fetch(`/api/cases/${id}/merge`, { method: "POST" });
+            fetchCases();
+        }
+
+        async function seedDemo() {
+            await fetch("/api/seed_demo", { method: "POST" });
+            fetchCases();
+        }
+
+        async function resetDb() {
+            await fetch("/api/reset", { method: "POST" });
+            fetchCases();
+        }
+
+        setInterval(fetchCases, 2000);
+        fetchCases();
+    </script>
+</body>
+</html>

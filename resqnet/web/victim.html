@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RESQNET - Offline SOS Sender</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #ef4444;
+            --accent-hover: #dc2626;
+            --green: #22c55e;
+            --amber: #f59e0b;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { margin: 0; background: var(--bg); color: var(--text); padding: 16px; max-width: 480px; margin-inline: auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 12px; margin-bottom: 16px; }
+        .title { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.5px; color: #f87171; }
+        .badge { padding: 6px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .badge.online { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
+        .badge.offline { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+        .sim-bar { background: #1e293b; border: 1px dashed #475569; padding: 10px 12px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
+        .card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 16px; border: 1px solid #334155; }
+        label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; margin-top: 12px; }
+        label:first-child { margin-top: 0; }
+        input, select, textarea { width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: var(--text); font-size: 0.95rem; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .gps-row { display: flex; gap: 8px; align-items: center; }
+        .btn-gps { background: #334155; color: #e2e8f0; border: none; padding: 11px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .btn-sos { width: 100%; margin-top: 18px; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4); }
+        .btn-sos:active { transform: scale(0.99); }
+        .queue-item { background: #0f172a; padding: 10px 12px; border-radius: 8px; margin-top: 8px; border-left: 4px solid var(--amber); font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+        .queue-item.confirmed { border-left-color: var(--green); }
+        .toast { padding: 12px; border-radius: 8px; margin-bottom: 14px; font-size: 0.88rem; font-weight: 600; display: none; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #22c55e; transition: .2s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%; }
+        input:checked + .slider { background-color: #f59e0b; }
+        input:checked + .slider:before { transform: translateX(20px); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <div class="title">RESQNET SOS</div>
+            <div style="font-size: 0.75rem; color: var(--muted);">Offline-First Disaster Transceiver</div>
+        </div>
+        <div id="connBadge" class="badge online">HOTSPOT LINKED</div>
+    </div>
+
+    <!-- Live Demo Step 4 Simulator: Toggle Out-Of-Range / Reconnect -->
+    <div class="sim-bar">
+        <div>
+            <strong>Demo Step 4: Simulate Out-of-Range</strong><br>
+            <span style="color: var(--muted); font-size: 0.75rem;">Queues SOS locally & auto-sends on reconnect</span>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="simulateOfflineToggle" onchange="checkConnection()">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div id="toastBox" class="toast"></div>
+
+    <div class="card">
+        <form id="sosForm" onsubmit="handleSosSubmit(event)">
+            <label>Emergency Type</label>
+            <select id="emergency_type" required>
+                <option value="Trapped / Structural Collapse">Trapped / Structural Collapse (+15 Urgency)</option>
+                <option value="Medical Emergency">Medical Emergency (+12 Urgency)</option>
+                <option value="Flash Flood / Rising Water">Flash Flood / Rising Water (+10 Urgency)</option>
+                <option value="Landslide">Landslide (+10 Urgency)</option>
+                <option value="Fire / Hazard">Fire / Hazard (+8 Urgency)</option>
+                <option value="Food / Water Shortage">Food / Water Shortage (+4 Urgency)</option>
+            </select>
+
+            <div class="grid-3">
+                <div>
+                    <label>Total People</label>
+                    <input type="number" id="people_count" value="3" min="1" max="200" required>
+                </div>
+                <div>
+                    <label>Children (x3)</label>
+                    <input type="number" id="children_count" value="1" min="0" max="100" required>
+                </div>
+                <div>
+                    <label>Injured (x2)</label>
+                    <input type="number" id="injured_count" value="1" min="0" max="100" required>
+                </div>
+            </div>
+
+            <label>GPS Coordinates (Offline Location Sensor)</label>
+            <div class="gps-row">
+                <input type="number" step="any" id="latitude" value="13.1845" placeholder="Lat" required>
+                <input type="number" step="any" id="longitude" value="74.9360" placeholder="Lon" required>
+                <button type="button" class="btn-gps" onclick="fetchGps()">Get GPS</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label>Your Name</label>
+                    <input type="text" id="victim_name" placeholder="Name / Landmark" required>
+                </div>
+                <div>
+                    <label>Phone (Optional)</label>
+                    <input type="text" id="phone" placeholder="Mobile #">
+                </div>
+            </div>
+
+            <label>Situation / Landmark Details</label>
+            <textarea id="notes" rows="2" placeholder="E.g., Stranded on 2nd floor terrace, water level rising..."></textarea>
+
+            <button type="submit" class="btn-sos">SEND EMERGENCY SOS</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 0.9rem;">Offline Packet Queue & Receipts</strong>
+            <button onclick="flushQueue()" style="background:#334155; color:white; border:none; padding:5px 10px; border-radius:6px; font-size:0.75rem; cursor:pointer;">Sync Now</button>
+        </div>
+        <div id="queueList" style="margin-top: 8px; color: var(--muted); font-size: 0.82rem;">No SOS packets queued yet.</div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = "resqnet_sos_queue_v1";
+        let isHotspotReachable = true;
+
+        function getStoredPackets() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+            catch { return []; }
+        }
+
+        function saveStoredPackets(list) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+            renderQueue();
+        }
+
+        function showToast(msg, bg, color) {
+            const box = document.getElementById("toastBox");
+            box.style.display = "block";
+            box.style.background = bg;
+            box.style.color = color;
+            box.innerText = msg;
+            setTimeout(() => { box.style.display = "none"; }, 5000);
+        }
+
+        function fetchGps() {
+            if (!navigator.geolocation) {
+                showToast("Geolocation unavailable; using preset GPS.", "#334155", "#f8fafc");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    document.getElementById("latitude").value = pos.coords.latitude.toFixed(6);
+                    document.getElementById("longitude").value = pos.coords.longitude.toFixed(6);
+                    showToast("Offline GPS lock acquired!", "rgba(34,197,94,0.2)", "#4ade80");
+                },
+                () => {
+                    // Add slight jitter for realistic demo testing if browser blocks non-HTTPS geolocation
+                    const baseLat = 13.1845 + (Math.random() - 0.5) * 0.004;
+                    const baseLon = 74.9360 + (Math.random() - 0.5) * 0.004;
+                    document.getElementById("latitude").value = baseLat.toFixed(6);
+                    document.getElementById("longitude").value = baseLon.toFixed(6);
+                    showToast("Simulated GPS lock set for demo.", "rgba(59,130,246,0.2)", "#93c5fd");
+                },
+                { enableHighAccuracy: true, timeout: 4000 }
+            );
+        }
+
+        async function checkConnection() {
+            const simOffline = document.getElementById("simulateOfflineToggle").checked;
+            const badge = document.getElementById("connBadge");
+            if (simOffline) {
+                isHotspotReachable = false;
+                badge.className = "badge offline";
+                badge.innerText = "OUT OF RANGE (QUEUING)";
+                return false;
+            }
+            try {
+                const ctrl = new AbortController();
+                setTimeout(() => ctrl.abort(), 2000);
+                const res = await fetch("/api/ping", { signal: ctrl.signal });
+                if (res.ok) {
+                    const wasOffline = !isHotspotReachable;
+                    isHotspotReachable = true;
+                    badge.className = "badge online";
+                    badge.innerText = "HOTSPOT LINKED";
+                    if (wasOffline) {
+                        flushQueue();
+                    }
+                    return true;
+                }
+            } catch (e) {}
+            isHotspotReachable = false;
+            badge.className = "badge offline";
+            badge.innerText = "OUT OF RANGE (QUEUING)";
+            return false;
+        }
+
+        async function handleSosSubmit(e) {
+            e.preventDefault();
+            const packet = {
+                client_id: "SOS-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+                emergency_type: document.getElementById("emergency_type").value,
+                people_count: parseInt(document.getElementById("people_count").value, 10),
+                children_count: parseInt(document.getElementById("children_count").value, 10),
+                injured_count: parseInt(document.getElementById("injured_count").value, 10),
+                latitude: parseFloat(document.getElementById("latitude").value),
+                longitude: parseFloat(document.getElementById("longitude").value),
+                victim_name: document.getElementById("victim_name").value,
+                phone: document.getElementById("phone").value,
+                notes: document.getElementById("notes").value,
+                queued_at: new Date().toLocaleTimeString(),
+                synced: false,
+                server_id: null
+            };
+
+            const list = getStoredPackets();
+            list.unshift(packet);
+            saveStoredPackets(list);
+
+            const online = await checkConnection();
+            if (online) {
+                await flushQueue();
+            } else {
+                showToast("Out of hotspot range! SOS saved to offline queue & will auto-send on reconnect.", "rgba(245,158,11,0.25)", "#fde68a");
+            }
+            document.getElementById("notes").value = "";
+        }
+
+        async function flushQueue() {
+            const simOffline = document.getElementById("simulateOfflineToggle").checked;
+            if (simOffline) return;
+
+            const list = getStoredPackets();
+            let updated = false;
+            for (let item of list) {
+                if (!item.synced) {
+                    try {
+                        const res = await fetch("/api/sos", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(item)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            item.synced = true;
+                            item.server_id = data.sos_id;
+                            updated = true;
+                            showToast("RECEIPT CONFIRMED: SOS #" + data.sos_id + " received by Rescue Laptop!", "rgba(34,197,94,0.25)", "#86efac");
+                        }
+                    } catch (err) {
+                        // Still unreachable
+                    }
+                }
+            }
+            if (updated) saveStoredPackets(list);
+        }
+
+        function renderQueue() {
+            const container = document.getElementById("queueList");
+            const list = getStoredPackets();
+            if (list.length === 0) {
+                container.innerHTML = "No SOS packets queued yet.";
+                return;
+            }
+            container.innerHTML = list.map(item => `
+                <div class="queue-item ${item.synced ? 'confirmed' : ''}">
+                    <div>
+                        <strong>${item.emergency_type}</strong> (${item.people_count} ppl, ${item.children_count} child, ${item.injured_count} inj)<br>
+                        <span style="color:var(--muted); font-size:0.75rem;">GPS: ${item.latitude}, ${item.longitude} • ${item.queued_at}</span>
+                    </div>
+                    <div style="font-weight:700; color:${item.synced ? '#4ade80' : '#fbbf24'};">
+                        ${item.synced ? '✓ CONFIRMED #' + item.server_id : '⏳ QUEUED'}
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        setInterval(checkConnection, 3000);
+        renderQueue();
+        checkConnection();
+    </script>
+</body>
+</html>
