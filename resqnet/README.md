@@ -56,31 +56,31 @@ Complete working prototype for **CODE FOR INNOVEX '26** matching the architectur
 
 ## Repository Directory Structure (For GitHub Judges)
 ```text
-RESQNET-Offline-SOS/
-├── app.py                              # Main Flask Rescue Server entry point
-├── requirements.txt                    # Python dependencies
-├── .gitignore                          # Git ignore rules for Python, SQLite & Android
-├── LICENSE                             # Open-Source MIT License
+resqnet/
 ├── backend/
-│   ├── models/
-│   │   └── database.py                 # SQLite schema & initialization
-│   └── services/
-│       └── scoring.py                  # Urgency formula & Haversine 50m duplicate detector
-├── templates/
-│   ├── dashboard.html                  # Rescue Team Command Center UI + Offline Radar
-│   └── victim.html                     # Mobile Offline-First Victim SOS PWA (/sos)
-├── android-app/                        # Native Android (Kotlin) Client Source
-│   └── app/
-│       ├── build.gradle                # Android Gradle configuration
-│       └── src/main/
-│           ├── AndroidManifest.xml     # Offline GPS & Wi-Fi Hotspot permissions
-│           ├── java/com/innovex/resqnet/
-│           │   ├── MainActivity.kt             # Android SOS Form & GPS Controller
-│           │   └── ResqNetOfflineManager.kt    # Offline Queue & Hotspot Auto-Sync
-│           └── res/layout/
-│               └── activity_main.xml   # Native Android dark-mode SOS UI layout
-├── tests/
-│   └── test_resqnet.py                 # Unit tests for urgency math & duplicate radius
-└── docs/
-    └── ARCHITECTURE.md                 # System flow & REST API documentation
+│   ├── app.py                      # Flask app and REST API routes
+│   ├── database.py                 # SQLite initialization and queries
+│   ├── scoring.py                  # Urgency score clustering logic
+│   ├── requirements.txt            # Python dependencies (Flask, etc.)
+│   └── tests/
+│       └── test_resqnet.py         # Pytest suite for backend endpoints
+├── android/
+│   ├── build.gradle                # Gradle build and dependency config
+│   └── src/
+│       └── main/
+│           ├── AndroidManifest.xml # Permissions for GPS and Wi-Fi
+│           ├── java/com/resqnet/
+│           │   ├── MainActivity.kt
+│           │   └── ResqNetOfflineManager.kt
+│           └── res/
+│               └── layout/
+│                   └── activity_main.xml
+├── web/
+│   ├── dashboard.html              # Command Center UI
+│   └── victim.html                 # PWA fallback for victims
+├── docs/
+│   └── DOC-20261109-WA0002.pdf     # Reference material
+├── ARCHITECTURE.md                 # System data flow and API specs
+├── README.md                       # Project setup instructions
+└── LICENSE                         # Legal open-source license
 ```
