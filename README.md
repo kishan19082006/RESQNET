@@ -1,6 +1,6 @@
 # RESQNET: Offline SOS Network (Disaster Resilience - PS2)
 
-Complete working prototype for **CODE FOR INNOVEX '26** matching the architecture and 5-step Live Demo Plan in your presentation.
+Complete working prototype for  matching the architecture and 5-step Live Demo Plan in your presentation.
 
 ---
 
