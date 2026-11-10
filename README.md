@@ -1,4 +1,4 @@
-# RESQNET: Offline SOS Network (Disaster Resilience - PS2)
+# RESQNET: Offline SOS Network (Disaster Resilience - PS 5)
 
 Complete working prototype for  matching the architecture and 5-step Live Demo Plan in your presentation.
 
